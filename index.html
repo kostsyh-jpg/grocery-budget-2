@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#111317" />
+  <title>Бюджет покупок — на двоих</title>
+  <style>
+    :root {
+      --bg: #111317;
+      --card: #1a1e26;
+      --card-2: #232833;
+      --text: #f3f4f6;
+      --muted: #9ca3af;
+      --accent: #3b82f6;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --border: #2c3240;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 14px 14px 44px; background: var(--bg); color: var(--text); }
+    h1 { font-size: 20px; margin: 4px 0 4px; }
+    .sub { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .tab {
+      flex: 1; padding: 10px 8px; border: 1px solid var(--border); border-radius: 10px;
+      background: var(--card); color: var(--muted); font-weight: 700; font-size: 13px;
+    }
+    .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px; margin-bottom: 12px;
+    }
+    .card-title { font-size: 15px; font-weight: 700; margin: 0 0 10px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    input {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--card-2); color: var(--text); font-size: 15px; margin-bottom: 10px;
+    }
+    .row { display: flex; gap: 8px; }
+    .row > div { flex: 1; }
+    button {
+      width: 100%; padding: 11px; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .btn-green { background: var(--green); color: #052e16; }
+    .btn-blue { background: var(--accent); color: #fff; }
+    .btn-ghost { background: var(--card-2); color: var(--text); border: 1px solid var(--border); }
+    .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .box { background: var(--card-2); padding: 10px; border-radius: 10px; }
+    .box-lbl { font-size: 12px; color: var(--muted); }
+    .box-val { font-size: 17px; font-weight: 800; margin-top: 2px; }
+    .ok { color: #34d399; }
+    .warn { color: #fbbf24; }
+    .meal-item, .shop-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--border); gap: 10px;
+    }
+    .meal-item:last-child, .shop-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .chk { width: 20px; height: 20px; margin: 0; accent-color: var(--green); flex-shrink: 0; }
+    .done { text-decoration: line-through; color: var(--muted); }
+    .pill {
+      display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px;
+      background: rgba(16, 185, 129, 0.14); color: #6ee7b7; margin-left: 6px;
+    }
+    .hidden { display: none; }
+    .toast {
+      position: fixed; bottom: 16px; left: 14px; right: 14px;
+      background: var(--green); color: #052e16; font-weight: 700;
+      padding: 12px; border-radius: 12px; text-align: center; display: none; z-index: 99;
+    }
+  </style>
+</head>
+<body>
+  <h1>Бюджет покупок</h1>
+  <div class="sub">На 2 человек · Без сладкого (зефир разрешён)</div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('menu', this)">Меню (2 чел.)</button>
+    <button class="tab" onclick="switchTab('shop', this)">Покупки</button>
+    <button class="tab" onclick="switchTab('prices', this)">Цены и лимит</button>
+  </div>
+
+  <!-- МЕНЮ НА 2 ЧЕЛОВЕКА -->
+  <div id="tab-menu">
+    <div class="card">
+      <div class="summary">
+        <div class="box">
+          <div class="box-lbl">Бюджет на закупку</div>
+          <div class="box-val" id="m-budget">0 ₽</div>
+        </div>
+        <div class="box">
+          <div class="box-lbl">Итого по меню (×2)</div>
+          <div class="box-val ok" id="m-total">0 ₽</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Выбери блюда на период (порции уже на двоих)</div>
+      <div id="meals-list"></div>
+      <button class="btn-green" style="margin-top:12px;" onclick="buildShoppingList()">Собрать список покупок</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Добавить своё блюдо (на 2 чел.)</div>
+      <label>Название блюда</label>
+      <input type="text" id="new-meal-name" placeholder="Например: Гречка с индейкой" />
+      <label>Ингредиенты через запятую (с весом/шт на 2 чел.)</label>
+      <input type="text" id="new-meal-ing" placeholder="Гречка 200г, Филе индейки 400г, Огурцы 2шт" />
+      <button class="btn-blue" onclick="addMeal()">+ Добавить блюдо</button>
+    </div>
+  </div>
+
+  <!-- СПИСОК ПОКУПОК -->
+  <div id="tab-shop" class="hidden">
+    <div class="card">
+      <div class="summary">
+        <div class="box">
+          <div class="box-lbl">В корзине (отмечено)</div>
+          <div class="box-val ok" id="s-checked">0 ₽</div>
+        </div>
+        <div class="box">
+          <div class="box-lbl">Остаток бюджета</div>
+          <div class="box-val warn" id="s-left">0 ₽</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div class="card-title" style="margin:0;">Список покупок</div>
+        <button class="btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;" onclick="clearChecked()">Убрать отмеченное</button>
+      </div>
+      <div id="shop-list"></div>
+    </div>
+  </div>
+
+  <!-- ЦЕНЫ И БЮДЖЕТ -->
+  <div id="tab-prices" class="hidden">
+    <div class="card">
+      <div class="card-title">Бюджет на закупку (₽)</div>
+      <input type="number" id="budget-input" min="0" step="100" onchange="updateBudget()" />
+    </div>
+
+    <div class="card">
+      <div class="card-title">Цены продуктов (можно править вручную)</div>
+      <div class="sub" style="margin-bottom:8px;">Позже сюда можно подгружать свежие цены из JSON</div>
+      <div id="prices-list"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const KEY = 'couple_grocery_budget_v1';
+
+    // Сладкое убрано, зефир оставлен; количества рассчитаны сразу на 2 человек
+    const DEFAULT_PRICES = {
+      'Куриное филе (500г)': 220,
+      'Рис (250г)': 55,
+      'Гречка (250г)': 50,
+      'Макароны (250г)': 45,
+      'Яйца (10 шт)': 110,
+      'Огурцы и помидоры (набор)': 160,
+      'Картофель (800г)': 65,
+      'Морковь и лук': 55,
+      'Творог (400г)': 150,
+      'Кефир / йогурт без сахара': 95,
+      'Хлеб / лаваш': 55,
+      'Зефир (упаковка)': 110
+    };
+
+    const DEFAULT_MEALS = [
+      {
+        id: 'm1',
+        title: 'Курица с рисом и овощами',
+        selected: true,
+        items: ['Куриное филе (500г)', 'Рис (250г)', 'Огурцы и помидоры (набор)']
+      },
+      {
+        id: 'm2',
+        title: 'Гречка с яйцами и салатом',
+        selected: true,
+        items: ['Гречка (250г)', 'Яйца (10 шт)', 'Огурцы и помидоры (набор)']
+      },
+      {
+        id: 'm3',
+        title: 'Картофель с курицей и зеленью/овощами',
+        selected: false,
+        items: ['Картофель (800г)', 'Куриное филе (500г)', 'Морковь и лук']
+      },
+      {
+        id: 'm4',
+        title: 'Завтраки: творог, кисломолочка и зефир к чаю',
+        selected: true,
+        items: ['Творог (400г)', 'Кефир / йогурт без сахара', 'Зефир (упаковка)']
+      },
+      {
+        id: 'm5',
+        title: 'Паста на скорую руку',
+        selected: false,
+        items: ['Макароны (250г)', 'Яйца (10 шт)', 'Хлеб / лаваш']
+      }
+    ];
+
+    let state = loadState();
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return {
+        budget: 5000,
+        prices: { ...DEFAULT_PRICES },
+        meals: DEFAULT_MEALS,
+        shopping: [] // { name, price, checked }
+      };
+    }
+
+    function saveState() {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }
+
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.style.display = 'block';
+      clearTimeout(window._t);
+      window._t = setTimeout(() => { el.style.display = 'none'; }, 2200);
+    }
+
+    function switchTab(tab, btn) {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      ['menu', 'shop', 'prices'].forEach(t => {
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
+      });
+      render();
+    }
+
+    function toggleMeal(id) {
+      const m = state.meals.find(x => x.id === id);
+      if (m) {
+        m.selected = !m.selected;
+        saveState();
+        render();
+      }
+    }
+
+    function addMeal() {
+      const title = document.getElementById('new-meal-name').value.trim();
+      const rawIng = document.getElementById('new-meal-ing').value.trim();
+      if (!title || !rawIng) {
+        toast('Укажи название блюда и продукты');
+        return;
+      }
+      const items = rawIng.split(',').map(s => s.trim()).filter(Boolean);
+      items.forEach(ing => {
+        if (!(ing in state.prices)) state.prices[ing] = 100;
+      });
+      state.meals.push({ id: 'm_' + Date.now(), title, selected: true, items });
+      document.getElementById('new-meal-name').value = '';
+      document.getElementById('new-meal-ing').value = '';
+      saveState();
+      render();
+      toast('Блюдо добавлено');
+    }
+
+    function calcMenuTotal() {
+      const uniqueItems = new Set();
+      state.meals.filter(m => m.selected).forEach(m => m.items.forEach(i => uniqueItems.add(i)));
+      let sum = 0;
+      uniqueItems.forEach(i => { sum += Number(state.prices[i] || 0); });
+      return sum;
+    }
+
+    function buildShoppingList() {
+      const uniqueItems = new Set();
+      state.meals.filter(m => m.selected).forEach(m => m.items.forEach(i => uniqueItems.add(i)));
+      const prevChecked = new Set(state.shopping.filter(s => s.checked).map(s => s.name));
+      state.shopping = Array.from(uniqueItems).map(name => ({
+        name,
+        price: Number(state.prices[name] || 0),
+        checked: prevChecked.has(name)
+      }));
+      saveState();
+      toast('Список покупок собран');
+      const shopBtn = document.querySelectorAll('.tab')[1];
+      switchTab('shop', shopBtn);
+    }
+
+    function toggleShopItem(idx) {
+      if (!state.shopping[idx]) return;
+      state.shopping[idx].checked = !state.shopping[idx].checked;
+      saveState();
+      render();
+    }
+
+    function clearChecked() {
+      state.shopping = state.shopping.filter(s => !s.checked);
+      saveState();
+      render();
+      toast('Отмеченные позиции убраны');
+    }
+
+    function updateBudget() {
+      const val = parseFloat(document.getElementById('budget-input').value);
+      state.budget = isNaN(val) ? 0 : val;
+      saveState();
+      render();
+    }
+
+    function updatePrice(name, val) {
+      const num = parseFloat(val);
+      state.prices[name] = isNaN(num) ? 0 : num;
+      state.shopping.forEach(s => { if (s.name === name) s.price = state.prices[name]; });
+      saveState();
+      render();
+    }
+
+    function render() {
+      const menuTotal = calcMenuTotal();
+      document.getElementById('m-budget').textContent = `${Math.round(state.budget)} ₽`;
+      const totalEl = document.getElementById('m-total');
+      totalEl.textContent = `${Math.round(menuTotal)} ₽`;
+      totalEl.className = 'box-val ' + (menuTotal > state.budget ? 'warn' : 'ok');
+
+      document.getElementById('meals-list').innerHTML = state.meals.map(m => {
+        const sum = m.items.reduce((acc, i) => acc + Number(state.prices[i] || 0), 0);
+        const hasZephyr = m.items.some(i => i.toLowerCase().includes('зефир'));
+        return `
+          <div class="meal-item" onclick="toggleMeal('${m.id}')">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <input type="checkbox" class="chk" ${m.selected ? 'checked' : ''} onclick="event.stopPropagation(); toggleMeal('${m.id}')" />
+              <div>
+                <div style="font-weight:700; font-size:14px;">
+                  ${m.title}${hasZephyr ? '<span class="pill">зефир</span>' : ''}
+                </div>
+                <div style="font-size:12px; color:var(--muted); margin-top:2px;">${m.items.join(' · ')}</div>
+              </div>
+            </div>
+            <div style="font-weight:700; font-size:14px; white-space:nowrap;">~${Math.round(sum)} ₽</div>
+          </div>
+        `;
+      }).join('');
+
+      const checkedSum = state.shopping.filter(s => s.checked).reduce((a, b) => a + b.price, 0);
+      const plannedSum = state.shopping.length
+        ? state.shopping.reduce((a, b) => a + b.price, 0)
+        : menuTotal;
+      document.getElementById('s-checked').textContent = `${Math.round(checkedSum)} ₽`;
+      const left = state.budget - plannedSum;
+      const leftEl = document.getElementById('s-left');
+      leftEl.textContent = `${Math.round(left)} ₽`;
+      leftEl.className = 'box-val ' + (left < 0 ? 'warn' : 'ok');
+
+      const shopEl = document.getElementById('shop-list');
+      if (!state.shopping.length) {
+        shopEl.innerHTML = '<div style="font-size:13px; color:var(--muted);">Выбери блюда во вкладке «Меню» и нажми «Собрать список покупок».</div>';
+      } else {
+        shopEl.innerHTML = state.shopping.map((s, idx) => `
+          <div class="shop-item" onclick="toggleShopItem(${idx})">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <input type="checkbox" class="chk" ${s.checked ? 'checked' : ''} onclick="event.stopPropagation(); toggleShopItem(${idx})" />
+              <div class="${s.checked ? 'done' : ''}" style="font-size:14px; font-weight:600;">${s.name}</div>
+            </div>
+            <div class="${s.checked ? 'done' : ''}" style="font-weight:700; font-size:14px;">${Math.round(s.price)} ₽</div>
+          </div>
+        `).join('');
+      }
+
+      document.getElementById('budget-input').value = state.budget;
+      document.getElementById('prices-list').innerHTML = Object.entries(state.prices).map(([name, pr]) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border);">
+          <span style="font-size:13px; flex:1;">${name}</span>
+          <input type="number" value="${pr}" style="width:95px; margin:0; padding:7px 9px; font-size:14px;" onchange="updatePrice('${name.replace(/'/g, "\\'")}', this.value)" />
+        </div>
+      `).join('');
+    }
+
+    render();
+  </script>
+</body>
+</html>
