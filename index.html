@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#111317" />
-  <title>Бюджет покупок — на двоих</title>
+  <title>Бюджет покупок — по магазинам</title>
   <style>
     :root {
       --bg: #111317;
@@ -15,25 +15,38 @@
       --accent: #3b82f6;
       --green: #10b981;
       --amber: #f59e0b;
+      --red: #ef4444;
       --border: #2c3240;
     }
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 14px 14px 44px; background: var(--bg); color: var(--text); }
+    body { margin: 0; padding: 14px 14px 48px; background: var(--bg); color: var(--text); }
     h1 { font-size: 20px; margin: 4px 0 4px; }
-    .sub { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
-    .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .sub { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+
+    /* Выбор магазина */
+    .store-bar { display: flex; gap: 6px; margin-bottom: 12px; }
+    .store-btn {
+      flex: 1; padding: 9px 6px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--card); color: var(--muted); font-weight: 700; font-size: 13px;
+    }
+    .store-btn.active {
+      background: rgba(16, 185, 129, 0.16); color: #6ee7b7; border-color: var(--green);
+    }
+
+    .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
     .tab {
-      flex: 1; padding: 10px 8px; border: 1px solid var(--border); border-radius: 10px;
+      flex: 1; padding: 10px 6px; border: 1px solid var(--border); border-radius: 10px;
       background: var(--card); color: var(--muted); font-weight: 700; font-size: 13px;
     }
     .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
     .card {
       background: var(--card); border: 1px solid var(--border);
       border-radius: 14px; padding: 14px; margin-bottom: 12px;
     }
     .card-title { font-size: 15px; font-weight: 700; margin: 0 0 10px; }
     label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-    input {
+    input, select {
       width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
       background: var(--card-2); color: var(--text); font-size: 15px; margin-bottom: 10px;
     }
@@ -46,22 +59,32 @@
     .btn-green { background: var(--green); color: #052e16; }
     .btn-blue { background: var(--accent); color: #fff; }
     .btn-ghost { background: var(--card-2); color: var(--text); border: 1px solid var(--border); }
+    .btn-del {
+      width: auto; padding: 5px 9px; font-size: 12px; border-radius: 8px;
+      background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35);
+    }
+
     .summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .box { background: var(--card-2); padding: 10px; border-radius: 10px; }
     .box-lbl { font-size: 12px; color: var(--muted); }
     .box-val { font-size: 17px; font-weight: 800; margin-top: 2px; }
     .ok { color: #34d399; }
     .warn { color: #fbbf24; }
-    .meal-item, .shop-item {
+
+    .item-row {
       display: flex; justify-content: space-between; align-items: center;
       padding: 10px 0; border-bottom: 1px solid var(--border); gap: 10px;
     }
-    .meal-item:last-child, .shop-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .item-row:last-child { border-bottom: none; padding-bottom: 0; }
     .chk { width: 20px; height: 20px; margin: 0; accent-color: var(--green); flex-shrink: 0; }
     .done { text-decoration: line-through; color: var(--muted); }
     .pill {
       display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px;
       background: rgba(16, 185, 129, 0.14); color: #6ee7b7; margin-left: 6px;
+    }
+    .cat-tag {
+      display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 6px;
+      background: var(--card-2); color: var(--muted); margin-top: 3px;
     }
     .hidden { display: none; }
     .toast {
@@ -75,49 +98,90 @@
   <h1>Бюджет покупок</h1>
   <div class="sub">На 2 человек · Без сладкого (зефир разрешён)</div>
 
+  <!-- ВЫБОР МАГАЗИНА -->
+  <div class="store-bar" id="store-bar"></div>
+
+  <!-- ВКЛАДКИ -->
   <div class="tabs">
-    <button class="tab active" onclick="switchTab('menu', this)">Меню (2 чел.)</button>
-    <button class="tab" onclick="switchTab('shop', this)">Покупки</button>
-    <button class="tab" onclick="switchTab('prices', this)">Цены и лимит</button>
+    <button class="tab active" onclick="switchTab('catalog', this)">Ассортимент</button>
+    <button class="tab" onclick="switchTab('menu', this)">Меню (×2)</button>
+    <button class="tab" onclick="switchTab('shop', this)">Корзина</button>
+    <button class="tab" onclick="switchTab('settings', this)">Лимит</button>
   </div>
 
-  <!-- МЕНЮ НА 2 ЧЕЛОВЕКА -->
-  <div id="tab-menu">
+  <!-- 1. АССОРТИМЕНТ ВЫБРАННОГО МАГАЗИНА -->
+  <div id="tab-catalog">
     <div class="card">
       <div class="summary">
         <div class="box">
-          <div class="box-lbl">Бюджет на закупку</div>
+          <div class="box-lbl">Магазин</div>
+          <div class="box-val" id="cat-store-name" style="font-size:15px;">—</div>
+        </div>
+        <div class="box">
+          <div class="box-lbl">Выбрано из полки</div>
+          <div class="box-val ok" id="cat-selected-sum">0 ₽</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Добавить товар в ассортимент магазина</div>
+      <div class="row">
+        <div style="flex:2;">
+          <label>Товар (вес / шт)</label>
+          <input type="text" id="new-item-name" placeholder="Филе грудки 500г" />
+        </div>
+        <div style="flex:1;">
+          <label>Цена (₽)</label>
+          <input type="number" id="new-item-price" placeholder="219" min="0" />
+        </div>
+      </div>
+      <label>Категория</label>
+      <select id="new-item-cat">
+        <option value="Мясо и птица">Мясо и птица</option>
+        <option value="Крупы и гарниры">Крупы и гарниры</option>
+        <option value="Овощи и зелень">Овощи и зелень</option>
+        <option value="Молочное и яйца">Молочное и яйца</option>
+        <option value="Хлеб и перекус (зефир)">Хлеб и перекус (зефир)</option>
+      </select>
+      <button class="btn-blue" onclick="addCatalogItem()">+ Добавить на полку магазина</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Ассортимент магазина (отметь, что берём)</div>
+      <div id="catalog-list"></div>
+      <button class="btn-green" style="margin-top:12px;" onclick="sendCatalogToCart()">Перенести выбранное в корзину</button>
+    </div>
+  </div>
+
+  <!-- 2. МЕНЮ НА 2 ЧЕЛОВЕКА -->
+  <div id="tab-menu" class="hidden">
+    <div class="card">
+      <div class="summary">
+        <div class="box">
+          <div class="box-lbl">Лимит закупки</div>
           <div class="box-val" id="m-budget">0 ₽</div>
         </div>
         <div class="box">
-          <div class="box-lbl">Итого по меню (×2)</div>
+          <div class="box-lbl">Меню по ценам сети</div>
           <div class="box-val ok" id="m-total">0 ₽</div>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">Выбери блюда на период (порции уже на двоих)</div>
+      <div class="card-title">Готовые связки блюд (на двоих)</div>
       <div id="meals-list"></div>
-      <button class="btn-green" style="margin-top:12px;" onclick="buildShoppingList()">Собрать список покупок</button>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Добавить своё блюдо (на 2 чел.)</div>
-      <label>Название блюда</label>
-      <input type="text" id="new-meal-name" placeholder="Например: Гречка с индейкой" />
-      <label>Ингредиенты через запятую (с весом/шт на 2 чел.)</label>
-      <input type="text" id="new-meal-ing" placeholder="Гречка 200г, Филе индейки 400г, Огурцы 2шт" />
-      <button class="btn-blue" onclick="addMeal()">+ Добавить блюдо</button>
+      <button class="btn-green" style="margin-top:12px;" onclick="buildFromMeals()">Добавить продукты из меню в корзину</button>
     </div>
   </div>
 
-  <!-- СПИСОК ПОКУПОК -->
+  <!-- 3. КОРЗИНА / СПИСОК ПОКУПОК -->
   <div id="tab-shop" class="hidden">
     <div class="card">
       <div class="summary">
         <div class="box">
-          <div class="box-lbl">В корзине (отмечено)</div>
+          <div class="box-lbl">Уже в тележке</div>
           <div class="box-val ok" id="s-checked">0 ₽</div>
         </div>
         <div class="box">
@@ -130,79 +194,108 @@
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <div class="card-title" style="margin:0;">Список покупок</div>
-        <button class="btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;" onclick="clearChecked()">Убрать отмеченное</button>
+        <button class="btn-ghost" style="width:auto; padding:6px 10px; font-size:12px;" onclick="clearChecked()">Очистить купленное</button>
       </div>
       <div id="shop-list"></div>
     </div>
   </div>
 
-  <!-- ЦЕНЫ И БЮДЖЕТ -->
-  <div id="tab-prices" class="hidden">
+  <!-- 4. ЛИМИТ И УПРАВЛЕНИЕ МАГАЗИНАМИ -->
+  <div id="tab-settings" class="hidden">
     <div class="card">
       <div class="card-title">Бюджет на закупку (₽)</div>
       <input type="number" id="budget-input" min="0" step="100" onchange="updateBudget()" />
     </div>
 
     <div class="card">
-      <div class="card-title">Цены продуктов (можно править вручную)</div>
-      <div class="sub" style="margin-bottom:8px;">Позже сюда можно подгружать свежие цены из JSON</div>
-      <div id="prices-list"></div>
+      <div class="card-title">Редактировать цены текущего магазина</div>
+      <div id="prices-editor"></div>
     </div>
   </div>
 
   <div id="toast" class="toast"></div>
 
   <script>
-    const KEY = 'couple_grocery_budget_v1';
+    const KEY = 'couple_store_budget_v2';
 
-    // Сладкое убрано, зефир оставлен; количества рассчитаны сразу на 2 человек
-    const DEFAULT_PRICES = {
-      'Куриное филе (500г)': 220,
-      'Рис (250г)': 55,
-      'Гречка (250г)': 50,
-      'Макароны (250г)': 45,
-      'Яйца (10 шт)': 110,
-      'Огурцы и помидоры (набор)': 160,
-      'Картофель (800г)': 65,
-      'Морковь и лук': 55,
-      'Творог (400г)': 150,
-      'Кефир / йогурт без сахара': 95,
-      'Хлеб / лаваш': 55,
-      'Зефир (упаковка)': 110
+    const INITIAL_DATA = {
+      budget: 5000,
+      activeStore: 'pyaterochka',
+      stores: {
+        pyaterochka: {
+          name: 'Пятёрочка',
+          catalog: [
+            { name: 'Куриное филе (500г)', price: 219, cat: 'Мясо и птица', picked: true },
+            { name: 'Филе индейки (450г)', price: 269, cat: 'Мясо и птица', picked: false },
+            { name: 'Рис круглозёрный (800г)', price: 99, cat: 'Крупы и гарниры', picked: true },
+            { name: 'Гречка ядрица (800г)', price: 89, cat: 'Крупы и гарниры', picked: true },
+            { name: 'Макароны твёрдых сортов (450г)', price: 79, cat: 'Крупы и гарниры', picked: false },
+            { name: 'Яйца С1 (10 шт)', price: 109, cat: 'Молочное и яйца', picked: true },
+            { name: 'Творог 5% (2 пачки по 200г)', price: 158, cat: 'Молочное и яйца', picked: true },
+            { name: 'Кефир / йогурт без сахара', price: 89, cat: 'Молочное и яйца', picked: true },
+            { name: 'Огурцы и помидоры (набор)', price: 169, cat: 'Овощи и зелень', picked: true },
+            { name: 'Картофель (1 кг)', price: 65, cat: 'Овощи и зелень', picked: false },
+            { name: 'Морковь и лук репчатый', price: 55, cat: 'Овощи и зелень', picked: false },
+            { name: 'Хлеб зерновой / лаваш', price: 59, cat: 'Хлеб и перекус (зефир)', picked: true },
+            { name: 'Зефир ванильный (упаковка)', price: 109, cat: 'Хлеб и перекус (зефир)', picked: true }
+          ]
+        },
+        magnit: {
+          name: 'Магнит',
+          catalog: [
+            { name: 'Куриное филе (500г)', price: 225, cat: 'Мясо и птица', picked: true },
+            { name: 'Филе индейки (450г)', price: 259, cat: 'Мясо и птица', picked: false },
+            { name: 'Рис круглозёрный (800г)', price: 95, cat: 'Крупы и гарниры', picked: true },
+            { name: 'Гречка ядрица (800г)', price: 85, cat: 'Крупы и гарниры', picked: true },
+            { name: 'Макароны твёрдых сортов (450г)', price: 75, cat: 'Крупы и гарниры', picked: false },
+            { name: 'Яйца С1 (10 шт)', price: 112, cat: 'Молочное и яйца', picked: true },
+            { name: 'Творог 5% (2 пачки по 200г)', price: 149, cat: 'Молочное и яйца', picked: true },
+            { name: 'Кефир / йогурт без сахара', price: 92, cat: 'Молочное и яйца', picked: true },
+            { name: 'Огурцы и помидоры (набор)', price: 159, cat: 'Овощи и зелень', picked: true },
+            { name: 'Картофель (1 кг)', price: 62, cat: 'Овощи и зелень', picked: false },
+            { name: 'Морковь и лук репчатый', price: 52, cat: 'Овощи и зелень', picked: false },
+            { name: 'Хлеб зерновой / лаваш', price: 55, cat: 'Хлеб и перекус (зефир)', picked: true },
+            { name: 'Зефир ванильный (упаковка)', price: 115, cat: 'Хлеб и перекус (зефир)', picked: true }
+          ]
+        },
+        other: {
+          name: 'Другой / Рынок',
+          catalog: [
+            { name: 'Куриное филе (500г)', price: 210, cat: 'Мясо и птица', picked: true },
+            { name: 'Огурцы и помидоры (набор)', price: 150, cat: 'Овощи и зелень', picked: true },
+            { name: 'Яйца С1 (10 шт)', price: 105, cat: 'Молочное и яйца', picked: true },
+            { name: 'Зефир ванильный (упаковка)', price: 100, cat: 'Хлеб и перекус (зефир)', picked: true }
+          ]
+        }
+      },
+      meals: [
+        {
+          id: 'm1',
+          title: 'Курица с рисом и овощным салатом',
+          selected: true,
+          items: ['Куриное филе (500г)', 'Рис круглозёрный (800г)', 'Огурцы и помидоры (набор)']
+        },
+        {
+          id: 'm2',
+          title: 'Гречка с яйцами и свежими овощами',
+          selected: true,
+          items: ['Гречка ядрица (800г)', 'Яйца С1 (10 шт)', 'Огурцы и помидоры (набор)']
+        },
+        {
+          id: 'm3',
+          title: 'Завтраки: творог, кисломолочка и зефир к чаю',
+          selected: true,
+          items: ['Творог 5% (2 пачки по 200г)', 'Кефир / йогурт без сахара', 'Зефир ванильный (упаковка)']
+        },
+        {
+          id: 'm4',
+          title: 'Запечённый картофель с курицей',
+          selected: false,
+          items: ['Картофель (1 кг)', 'Куриное филе (500г)', 'Морковь и лук репчатый']
+        }
+      ],
+      cart: []
     };
-
-    const DEFAULT_MEALS = [
-      {
-        id: 'm1',
-        title: 'Курица с рисом и овощами',
-        selected: true,
-        items: ['Куриное филе (500г)', 'Рис (250г)', 'Огурцы и помидоры (набор)']
-      },
-      {
-        id: 'm2',
-        title: 'Гречка с яйцами и салатом',
-        selected: true,
-        items: ['Гречка (250г)', 'Яйца (10 шт)', 'Огурцы и помидоры (набор)']
-      },
-      {
-        id: 'm3',
-        title: 'Картофель с курицей и зеленью/овощами',
-        selected: false,
-        items: ['Картофель (800г)', 'Куриное филе (500г)', 'Морковь и лук']
-      },
-      {
-        id: 'm4',
-        title: 'Завтраки: творог, кисломолочка и зефир к чаю',
-        selected: true,
-        items: ['Творог (400г)', 'Кефир / йогурт без сахара', 'Зефир (упаковка)']
-      },
-      {
-        id: 'm5',
-        title: 'Паста на скорую руку',
-        selected: false,
-        items: ['Макароны (250г)', 'Яйца (10 шт)', 'Хлеб / лаваш']
-      }
-    ];
 
     let state = loadState();
 
@@ -211,12 +304,7 @@
         const raw = localStorage.getItem(KEY);
         if (raw) return JSON.parse(raw);
       } catch (e) {}
-      return {
-        budget: 5000,
-        prices: { ...DEFAULT_PRICES },
-        meals: DEFAULT_MEALS,
-        shopping: [] // { name, price, checked }
-      };
+      return INITIAL_DATA;
     }
 
     function saveState() {
@@ -231,13 +319,80 @@
       window._t = setTimeout(() => { el.style.display = 'none'; }, 2200);
     }
 
+    function currentStore() {
+      return state.stores[state.activeStore];
+    }
+
+    function getPriceInStore(name) {
+      const found = currentStore().catalog.find(i => i.name === name);
+      return found ? Number(found.price) : 0;
+    }
+
+    function selectStore(storeKey) {
+      state.activeStore = storeKey;
+      // Пересчитываем цены в текущей корзине под новый магазин
+      state.cart.forEach(item => {
+        const p = getPriceInStore(item.name);
+        if (p > 0) item.price = p;
+      });
+      saveState();
+      render();
+      toast(`Выбран магазин: ${currentStore().name}`);
+    }
+
     function switchTab(tab, btn) {
       document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      ['menu', 'shop', 'prices'].forEach(t => {
+      ['catalog', 'menu', 'shop', 'settings'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== tab);
       });
       render();
+    }
+
+    function toggleCatalogItem(idx) {
+      const item = currentStore().catalog[idx];
+      if (!item) return;
+      item.picked = !item.picked;
+      saveState();
+      render();
+    }
+
+    function addCatalogItem() {
+      const name = document.getElementById('new-item-name').value.trim();
+      const price = parseFloat(document.getElementById('new-item-price').value);
+      const cat = document.getElementById('new-item-cat').value;
+      if (!name || isNaN(price)) {
+        toast('Укажи название товара и цену');
+        return;
+      }
+      currentStore().catalog.unshift({ name, price, cat, picked: true });
+      document.getElementById('new-item-name').value = '';
+      document.getElementById('new-item-price').value = '';
+      saveState();
+      render();
+      toast(`Добавлено в «${currentStore().name}»`);
+    }
+
+    function deleteCatalogItem(idx) {
+      currentStore().catalog.splice(idx, 1);
+      saveState();
+      render();
+    }
+
+    function sendCatalogToCart() {
+      const picked = currentStore().catalog.filter(i => i.picked);
+      const existingNames = new Set(state.cart.map(c => c.name));
+      picked.forEach(p => {
+        if (!existingNames.has(p.name)) {
+          state.cart.push({ name: p.name, price: Number(p.price), checked: false });
+        } else {
+          const found = state.cart.find(c => c.name === p.name);
+          if (found) found.price = Number(p.price);
+        }
+      });
+      saveState();
+      toast('Товары перенесены в корзину');
+      switchTab('shop', document.querySelectorAll('.tab')[2]);
     }
 
     function toggleMeal(id) {
@@ -249,60 +404,34 @@
       }
     }
 
-    function addMeal() {
-      const title = document.getElementById('new-meal-name').value.trim();
-      const rawIng = document.getElementById('new-meal-ing').value.trim();
-      if (!title || !rawIng) {
-        toast('Укажи название блюда и продукты');
-        return;
-      }
-      const items = rawIng.split(',').map(s => s.trim()).filter(Boolean);
-      items.forEach(ing => {
-        if (!(ing in state.prices)) state.prices[ing] = 100;
+    function buildFromMeals() {
+      const existingNames = new Set(state.cart.map(c => c.name));
+      state.meals.filter(m => m.selected).forEach(m => {
+        m.items.forEach(name => {
+          const price = getPriceInStore(name) || 100;
+          if (!existingNames.has(name)) {
+            state.cart.push({ name, price, checked: false });
+            existingNames.add(name);
+          }
+        });
       });
-      state.meals.push({ id: 'm_' + Date.now(), title, selected: true, items });
-      document.getElementById('new-meal-name').value = '';
-      document.getElementById('new-meal-ing').value = '';
       saveState();
-      render();
-      toast('Блюдо добавлено');
+      toast('Продукты из меню добавлены в корзину');
+      switchTab('shop', document.querySelectorAll('.tab')[2]);
     }
 
-    function calcMenuTotal() {
-      const uniqueItems = new Set();
-      state.meals.filter(m => m.selected).forEach(m => m.items.forEach(i => uniqueItems.add(i)));
-      let sum = 0;
-      uniqueItems.forEach(i => { sum += Number(state.prices[i] || 0); });
-      return sum;
-    }
-
-    function buildShoppingList() {
-      const uniqueItems = new Set();
-      state.meals.filter(m => m.selected).forEach(m => m.items.forEach(i => uniqueItems.add(i)));
-      const prevChecked = new Set(state.shopping.filter(s => s.checked).map(s => s.name));
-      state.shopping = Array.from(uniqueItems).map(name => ({
-        name,
-        price: Number(state.prices[name] || 0),
-        checked: prevChecked.has(name)
-      }));
-      saveState();
-      toast('Список покупок собран');
-      const shopBtn = document.querySelectorAll('.tab')[1];
-      switchTab('shop', shopBtn);
-    }
-
-    function toggleShopItem(idx) {
-      if (!state.shopping[idx]) return;
-      state.shopping[idx].checked = !state.shopping[idx].checked;
+    function toggleCartItem(idx) {
+      if (!state.cart[idx]) return;
+      state.cart[idx].checked = !state.cart[idx].checked;
       saveState();
       render();
     }
 
     function clearChecked() {
-      state.shopping = state.shopping.filter(s => !s.checked);
+      state.cart = state.cart.filter(c => !c.checked);
       saveState();
       render();
-      toast('Отмеченные позиции убраны');
+      toast('Купленные товары убраны');
     }
 
     function updateBudget() {
@@ -312,32 +441,69 @@
       render();
     }
 
-    function updatePrice(name, val) {
+    function updateCatalogPrice(idx, val) {
       const num = parseFloat(val);
-      state.prices[name] = isNaN(num) ? 0 : num;
-      state.shopping.forEach(s => { if (s.name === name) s.price = state.prices[name]; });
+      const item = currentStore().catalog[idx];
+      if (!item) return;
+      item.price = isNaN(num) ? 0 : num;
+      state.cart.forEach(c => { if (c.name === item.name) c.price = item.price; });
       saveState();
       render();
     }
 
     function render() {
-      const menuTotal = calcMenuTotal();
+      // Панель магазинов
+      document.getElementById('store-bar').innerHTML = Object.entries(state.stores).map(([key, st]) => `
+        <button class="store-btn ${state.activeStore === key ? 'active' : ''}" onclick="selectStore('${key}')">
+          ${st.name}
+        </button>
+      `).join('');
+
+      const st = currentStore();
+      document.getElementById('cat-store-name').textContent = st.name;
+      const pickedSum = st.catalog.filter(i => i.picked).reduce((a, b) => a + Number(b.price), 0);
+      document.getElementById('cat-selected-sum').textContent = `${Math.round(pickedSum)} ₽`;
+
+      document.getElementById('catalog-list').innerHTML = st.catalog.map((item, idx) => {
+        const isZephyr = item.name.toLowerCase().includes('зефир');
+        return `
+          <div class="item-row" onclick="toggleCatalogItem(${idx})">
+            <div style="display:flex; align-items:center; gap:10px; flex:1;">
+              <input type="checkbox" class="chk" ${item.picked ? 'checked' : ''} onclick="event.stopPropagation(); toggleCatalogItem(${idx})" />
+              <div>
+                <div style="font-weight:600; font-size:14px;">
+                  ${item.name}${isZephyr ? '<span class="pill">зефир</span>' : ''}
+                </div>
+                <div class="cat-tag">${item.cat}</div>
+              </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-weight:700; font-size:14px;">${Math.round(item.price)} ₽</span>
+              <button class="btn-del" onclick="event.stopPropagation(); deleteCatalogItem(${idx})">×</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Меню
+      let menuSum = 0;
+      const uniqueMenuItems = new Set();
+      state.meals.filter(m => m.selected).forEach(m => m.items.forEach(n => uniqueMenuItems.add(n)));
+      uniqueMenuItems.forEach(n => { menuSum += getPriceInStore(n); });
+
       document.getElementById('m-budget').textContent = `${Math.round(state.budget)} ₽`;
-      const totalEl = document.getElementById('m-total');
-      totalEl.textContent = `${Math.round(menuTotal)} ₽`;
-      totalEl.className = 'box-val ' + (menuTotal > state.budget ? 'warn' : 'ok');
+      const mTotalEl = document.getElementById('m-total');
+      mTotalEl.textContent = `${Math.round(menuSum)} ₽`;
+      mTotalEl.className = 'box-val ' + (menuSum > state.budget ? 'warn' : 'ok');
 
       document.getElementById('meals-list').innerHTML = state.meals.map(m => {
-        const sum = m.items.reduce((acc, i) => acc + Number(state.prices[i] || 0), 0);
-        const hasZephyr = m.items.some(i => i.toLowerCase().includes('зефир'));
+        const sum = m.items.reduce((acc, n) => acc + getPriceInStore(n), 0);
         return `
-          <div class="meal-item" onclick="toggleMeal('${m.id}')">
+          <div class="item-row" onclick="toggleMeal('${m.id}')">
             <div style="display:flex; align-items:center; gap:10px;">
               <input type="checkbox" class="chk" ${m.selected ? 'checked' : ''} onclick="event.stopPropagation(); toggleMeal('${m.id}')" />
               <div>
-                <div style="font-weight:700; font-size:14px;">
-                  ${m.title}${hasZephyr ? '<span class="pill">зефир</span>' : ''}
-                </div>
+                <div style="font-weight:700; font-size:14px;">${m.title}</div>
                 <div style="font-size:12px; color:var(--muted); margin-top:2px;">${m.items.join(' · ')}</div>
               </div>
             </div>
@@ -346,36 +512,36 @@
         `;
       }).join('');
 
-      const checkedSum = state.shopping.filter(s => s.checked).reduce((a, b) => a + b.price, 0);
-      const plannedSum = state.shopping.length
-        ? state.shopping.reduce((a, b) => a + b.price, 0)
-        : menuTotal;
-      document.getElementById('s-checked').textContent = `${Math.round(checkedSum)} ₽`;
-      const left = state.budget - plannedSum;
+      // Корзина
+      const inBasket = state.cart.filter(c => c.checked).reduce((a, b) => a + Number(b.price), 0);
+      const totalCart = state.cart.reduce((a, b) => a + Number(b.price), 0);
+      document.getElementById('s-checked').textContent = `${Math.round(inBasket)} ₽`;
+      const left = state.budget - totalCart;
       const leftEl = document.getElementById('s-left');
       leftEl.textContent = `${Math.round(left)} ₽`;
       leftEl.className = 'box-val ' + (left < 0 ? 'warn' : 'ok');
 
       const shopEl = document.getElementById('shop-list');
-      if (!state.shopping.length) {
-        shopEl.innerHTML = '<div style="font-size:13px; color:var(--muted);">Выбери блюда во вкладке «Меню» и нажми «Собрать список покупок».</div>';
+      if (!state.cart.length) {
+        shopEl.innerHTML = '<div style="font-size:13px; color:var(--muted);">Выбери товары на полке магазина или в меню и перенеси в корзину.</div>';
       } else {
-        shopEl.innerHTML = state.shopping.map((s, idx) => `
-          <div class="shop-item" onclick="toggleShopItem(${idx})">
+        shopEl.innerHTML = state.cart.map((c, idx) => `
+          <div class="item-row" onclick="toggleCartItem(${idx})">
             <div style="display:flex; align-items:center; gap:10px;">
-              <input type="checkbox" class="chk" ${s.checked ? 'checked' : ''} onclick="event.stopPropagation(); toggleShopItem(${idx})" />
-              <div class="${s.checked ? 'done' : ''}" style="font-size:14px; font-weight:600;">${s.name}</div>
+              <input type="checkbox" class="chk" ${c.checked ? 'checked' : ''} onclick="event.stopPropagation(); toggleCartItem(${idx})" />
+              <div class="${c.checked ? 'done' : ''}" style="font-size:14px; font-weight:600;">${c.name}</div>
             </div>
-            <div class="${s.checked ? 'done' : ''}" style="font-weight:700; font-size:14px;">${Math.round(s.price)} ₽</div>
+            <div class="${c.checked ? 'done' : ''}" style="font-weight:700; font-size:14px;">${Math.round(c.price)} ₽</div>
           </div>
         `).join('');
       }
 
+      // Настройки
       document.getElementById('budget-input').value = state.budget;
-      document.getElementById('prices-list').innerHTML = Object.entries(state.prices).map(([name, pr]) => `
+      document.getElementById('prices-editor').innerHTML = st.catalog.map((item, idx) => `
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border);">
-          <span style="font-size:13px; flex:1;">${name}</span>
-          <input type="number" value="${pr}" style="width:95px; margin:0; padding:7px 9px; font-size:14px;" onchange="updatePrice('${name.replace(/'/g, "\\'")}', this.value)" />
+          <span style="font-size:13px; flex:1;">${item.name}</span>
+          <input type="number" value="${item.price}" style="width:90px; margin:0; padding:7px 9px; font-size:14px;" onchange="updateCatalogPrice(${idx}, this.value)" />
         </div>
       `).join('');
     }
@@ -384,3 +550,4 @@
   </script>
 </body>
 </html>
+
